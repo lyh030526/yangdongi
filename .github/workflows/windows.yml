@@ -1,0 +1,22 @@
+name: Windows desktop build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  desktop:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt pytest pyinstaller
+      - run: python -m pytest -q
+        env:
+          QT_QPA_PLATFORM: offscreen
+      - run: pyinstaller --noconfirm --windowed --name Yangdongi --collect-all PySide6 run.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Yangdongi-Windows
+          path: dist/Yangdongi/
