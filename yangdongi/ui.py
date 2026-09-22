@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QLabe
     QPushButton, QVBoxLayout, QHBoxLayout, QStackedWidget, QCheckBox, QComboBox,
     QSlider, QLineEdit, QScrollArea, QSystemTrayIcon, QMenu, QProgressBar, QButtonGroup)
 from .art import PetArt
+from .device import PetWindow
 from .state import SCENARIOS
 
 
@@ -33,83 +34,13 @@ def card(name='card'):
     return w, layout
 
 
-class PetWindow(QWidget):
-    open_requested = Signal()
-
-    def __init__(self, state, settings):
-        super().__init__()
-        self.state, self.settings = state, settings
-        self.setWindowTitle('양동이 · 데스크톱 펫')
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
-        self.setFixedSize(290, 330)
-        self.drag = None
-        box = QVBoxLayout(self)
-        box.setContentsMargins(10, 6, 10, 6)
-        self.bubble = label('안녕! 나는 양동이야.\n오늘도 네 곁에 있을게.', wrap=True)
-        self.bubble.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.bubble.setStyleSheet('background: #fffdf7; color: #534d40; border: 1px solid #e3ddce; border-radius: 17px; padding: 14px;')
-        self.bubble.setMinimumHeight(72)
-        box.addWidget(self.bubble)
-        box.addWidget(PetArt(), 1)
-        self.setToolTip('드래그해서 이동 · 두 번 클릭해 열기 · 오른쪽 클릭 메뉴')
-        state.message.connect(self.speak)
-        self.dismiss = QTimer(self)
-        self.dismiss.setSingleShot(True)
-        self.dismiss.timeout.connect(self.bubble.hide)
-        self.restore_position()
-
-    def restore_position(self):
-        area = QApplication.primaryScreen().availableGeometry()
-        point = self.settings.value('petPosition')
-        if point is not None and any(s.availableGeometry().contains(point) for s in QApplication.screens()):
-            self.move(point)
-        else:
-            self.move(area.right()-self.width()-30, area.bottom()-self.height()-35)
-
-    def speak(self, text):
-        if not self.state.quiet:
-            self.bubble.setText(text)
-            self.bubble.show()
-            self.dismiss.start(12000)
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.drag = event.globalPosition().toPoint()-self.pos()
-
-    def mouseMoveEvent(self, event):
-        if self.drag is not None:
-            self.move(event.globalPosition().toPoint()-self.drag)
-
-    def mouseReleaseEvent(self, event):
-        self.drag = None
-        screen = QApplication.screenAt(self.geometry().center()) or QApplication.primaryScreen()
-        r = screen.availableGeometry()
-        self.move(max(r.left(), min(self.x(), r.right()-self.width()+1)),
-                  max(r.top(), min(self.y(), r.bottom()-self.height()+1)))
-        self.settings.setValue('petPosition', self.pos())
-
-    def mouseDoubleClickEvent(self, event):
-        self.open_requested.emit()
-
-    def contextMenuEvent(self, event):
-        menu = QMenu(self)
-        menu.addAction('양동이 열기', self.open_requested.emit)
-        menu.addAction('집중 모드 시작 / 일시정지', self.state.toggle_focus)
-        menu.addAction('양동이 숨기기', self.hide)
-        menu.addSeparator()
-        menu.addAction('종료', QApplication.quit)
-        menu.exec(event.globalPos())
-
-
 class MainWindow(QMainWindow):
     def __init__(self, state, settings=None):
         super().__init__()
         self.state = state
         self.settings = settings or QSettings('Yangdongi', 'Companion')
         self.pet = PetWindow(state, self.settings)
-        self.pet.open_requested.connect(self.reveal)
+        self.pet.open_requested.connect(self.open_settings)
         self.setWindowTitle('양동이 — 너의 하루에, 작은 친구')
         self.resize(1160, 820)
         self.setMinimumSize(1040, 760)
@@ -180,6 +111,7 @@ class MainWindow(QMainWindow):
 
     def page(self, title, subtitle):
         w = QWidget()
+        w.setObjectName('page')
         v = QVBoxLayout(w)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(17)
@@ -326,7 +258,7 @@ class MainWindow(QMainWindow):
         v.addWidget(c)
         c, box = card()
         box.addWidget(label('가볍고 조용하게', 'heading'))
-        box.addWidget(label('이 시안은 화면 캡처, OCR, 앱 활동 수집을 수행하지 않아요.\n집중 타이머는 실행 중에만 갱신하고, 캐릭터는 변화가 있을 때만 그려요.', wrap=True))
+        box.addWidget(label('이 시안은 화면 캡처, OCR, 앱 활동 수집을 수행하지 않아요.\n집중 타이머는 실행 중에만 갱신하고, 펫 애니메이션은 보일 때만 재생해요.', wrap=True))
         box.addWidget(label('네 활동은 네 컴퓨터 안에. 필요한 순간에만, 조용히 말을 걸어요.', 'muted', True))
         v.addWidget(c)
         v.addStretch()
@@ -348,11 +280,11 @@ class MainWindow(QMainWindow):
     def set_quiet(self, checked):
         self.state.quiet = checked
         if checked:
-            self.pet.bubble.hide()
+            self.pet.update()
         self.settings.setValue('quiet', checked)
 
     def resize_pet(self, value):
-        self.pet.setFixedSize(round(290*value/100), round(330*value/100))
+        self.pet.setFixedSize(round(360*value/100), round(480*value/100))
         self.settings.setValue('size', value)
 
     def refresh_clock(self):
@@ -397,8 +329,12 @@ class MainWindow(QMainWindow):
     def show_pet(self):
         self.pet.show()
         if self.state.quiet:
-            self.pet.bubble.hide()
+            self.pet.update()
         self.pet.raise_()
+
+    def open_settings(self):
+        self.navigate(3)
+        self.reveal()
 
     def reveal(self):
         self.showNormal()

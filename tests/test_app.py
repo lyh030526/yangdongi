@@ -68,10 +68,29 @@ def test_window_interactions(app, tmp_path):
     window.quiet.setChecked(True)
     assert state.quiet and settings.value('quiet', type=bool)
     window.size_slider.setValue(125)
-    assert window.pet.width() == round(290*1.25)
+    assert window.pet.width() == round(360*1.25)
     window.topmost.setChecked(False)
     assert not window.pet.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
     state.reset()
     window.tray.hide()
     window.pet.hide()
     window.hide()
+
+
+def test_device_animation_lifecycle(app, tmp_path):
+    from yangdongi.device import PetWindow
+    state = CompanionState()
+    pet = PetWindow(state, QSettings(str(tmp_path/'pet.ini'), QSettings.Format.IniFormat))
+    assert not pet.frame_timer.isActive()
+    pet.show()
+    app.processEvents()
+    assert pet.frame_timer.isActive()
+    pet.play()
+    assert '간지러워' in pet.text
+    for scene in ('coding', 'music', 'youtube'):
+        state.simulate(scene)
+        for t in (0.0, 0.5, 1.5):
+            pet.preview_time = t
+            assert not pet.grab().isNull()
+    pet.hide()
+    assert not pet.frame_timer.isActive()

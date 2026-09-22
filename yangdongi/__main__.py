@@ -13,7 +13,6 @@ def main():
     app.setStyleSheet(STYLE)
     state = CompanionState()
     window = MainWindow(state)
-    window.show()
     window.show_pet()
     sys.exit(app.exec())
 

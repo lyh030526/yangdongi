@@ -1,6 +1,6 @@
 STYLE = '''
 QWidget { color: #393a33; font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; font-size: 13px; }
-QMainWindow, #root { background: #f7f8f3; }
+QMainWindow, #root, #page { background: #f7f8f3; }
 QFrame#sidebar { background: #eff1e8; border-right: 1px solid #e0e4d8; }
 QFrame#card { background: #ffffff; border: 1px solid #e4e7dd; border-radius: 18px; }
 QFrame#hero { background: #f2efdf; border: 1px solid #e6e3d4; border-radius: 18px; }
